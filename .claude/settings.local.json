@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(brew list:*)",
+      "Bash(brew info:*)",
+      "Bash(brew search:*)",
+      "Bash(/opt/homebrew/opt/node/bin/node --version)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(kill 22204)",
+      "Bash(kill 22211)",
+      "Bash(lsof -ti :5000 -sTCP:LISTEN)",
+      "Bash(./venv/bin/python -c \":*)",
+      "Bash(./venv/bin/python scraper.py)",
+      "Bash(find '/Users/julianperez/Documents/Cinema Club/frontend' -maxdepth 1 -type f \\\\\\(-name .* -o -name *.config.* \\\\\\) ! -name .DS_Store)",
+      "Bash(npm install:*)",
+      "Bash(./venv/bin/python -c \"import app; print\\(''Backend imports OK''\\)\")",
+      "Bash(npx vite:*)",
+      "Bash(curl -s http://localhost:5000/api/auth/me)",
+      "Bash(curl -sI http://localhost:5000/api/auth/me)",
+      "Bash(curl -s http://localhost:5001/api/auth/me)",
+      "Bash(xargs kill:*)",
+      "WebFetch(domain:silver.afi.com)",
+      "WebFetch(domain:vista.afi.com)",
+      "Bash(lsof -ti:5001)"
+    ]
+  }
+}
