@@ -18,7 +18,7 @@ const THEATRE_SHORT = { suns: "SUNS", afi: "AFI", estreet: "E ST" };
 
 // Time-of-day buckets
 const TIME_BUCKETS = [
-  { key: "morning",   label: "Morning",   icon: "\u2600", test: h => h < 12 },
+  { key: "morning",   label: "Morning",   icon: "\u2600\uFE0F", test: h => h < 12 },
   { key: "afternoon", label: "Afternoon", icon: "\u26C5", test: h => h >= 12 && h < 17 },
   { key: "evening",   label: "Evening",   icon: "\uD83C\uDF19", test: h => h >= 17 },
 ];
@@ -168,7 +168,16 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
     if (month === 11) { setYear(y => y + 1); setMonth(0); }
     else setMonth(m => m + 1);
   }
-  function goToday() { setYear(today.getFullYear()); setMonth(today.getMonth()); }
+  function goToday() {
+    setYear(today.getFullYear());
+    setMonth(today.getMonth());
+    setSelected(null);
+    // scroll to today's cell after render
+    setTimeout(() => {
+      const el = document.querySelector(".cal-day.today");
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  }
 
   function toggleTheatre(slug) {
     setActiveTheatres(prev => {
@@ -285,7 +294,7 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
     <div className="app-shell">
       {/* Header */}
       <header className="header">
-        <span className="header-logo">CINEMA CLUB DC</span>
+        <span className="header-logo" onClick={goToday} style={{ cursor: "pointer" }}>CINEMA CLUB DC</span>
         <div className="header-sep" />
 
         <div className="nav-week">

@@ -1348,6 +1348,14 @@ input { font-family: inherit; }
   gap: 0.5rem;
 }
 
+/* Theatre pill container */
+.theatre-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
 /* Theatre pill selectors (group create & admin) */
 .theatre-pill {
   font-size: 0.65rem;
@@ -1809,6 +1817,7 @@ input { font-family: inherit; }
   .header-logo { font-size: 1.2rem; }
   .header-sep { display: none; }
   .header-spacer { display: none; }
+  .group-switcher { margin-left: auto; }
   .nav-range { font-size: 0.65rem; }
   .filter-bar {
     flex-wrap: wrap;
@@ -1816,16 +1825,43 @@ input { font-family: inherit; }
     gap: 0.4rem;
   }
   .filter-search-wrap {
-    flex: 1 1 100%;
-    max-width: 100%;
-    order: 10;
+    flex: 1 1 0;
+    max-width: none;
+    min-width: 0;
+    order: 5;
   }
+  .filter-search-wrap .filter-dd-menu {
+    min-width: 260px;
+    max-width: calc(100vw - 1.5rem);
+    right: 0;
+    left: auto;
+  }
+  .filter-time-pills { order: 2; }
   .filter-time-label { display: none; }
   .filter-time-pill { padding: 0.25rem 0.45rem; }
   .group-switcher-btn {
-    max-width: 140px;
+    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .group-dropdown {
+    right: 0;
+    left: auto;
+    max-width: calc(100vw - 1.5rem);
+  }
+  .group-members-close {
+    font-size: 1.6rem;
+    min-width: 36px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .group-members-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
   }
 
   /* ── Calendar Grid → single-column day list ── */
@@ -1952,7 +1988,7 @@ input { font-family: inherit; }
   .nav-today { font-size: 0.55rem; padding: 0.2rem 0.4rem; }
   .nav-range { font-size: 0.6rem; }
   .user-avatar { width: 26px; height: 26px; font-size: 0.6rem; }
-  .group-switcher-btn { max-width: 110px; font-size: 0.58rem; }
+  .group-switcher-btn { max-width: 140px; font-size: 0.58rem; }
   .filter-dd-btn { font-size: 0.52rem; padding: 0.2rem 0.4rem; }
   .filter-time-pill { font-size: 0.48rem; }
   .filter-search-input { font-size: 0.55rem; }

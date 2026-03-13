@@ -12,7 +12,12 @@ from email.mime.multipart import MIMEMultipart
 from functools import wraps
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env.development if it exists (local dev), otherwise .env (production/Docker)
+env_file = os.path.join(os.path.dirname(__file__), '.env.development')
+if os.path.exists(env_file):
+    load_dotenv(env_file)
+else:
+    load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))

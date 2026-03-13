@@ -5,3 +5,5 @@ __pycache__/
 node_modules/
 .env
 .env.production
+.env.development
+backend/instance/cinemaclub_dev.db

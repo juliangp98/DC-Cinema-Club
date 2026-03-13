@@ -219,8 +219,8 @@ def scrape_afi():
                 if trailer_tag and trailer_tag.get('href') and not trailer_tag['href'].startswith('javascript'):
                     movie['trailer_link'] = urljoin(base_url, trailer_tag['href'])
 
-                # Poster image – first reasonably prominent image on the page.
-                poster = film_soup.find('img', class_=re.compile(r'poster|film.?image', re.I)) or film_soup.find('img')
+                # Poster image – look for the FilmPosterGraphic from vista CDN.
+                poster = film_soup.find('img', src=re.compile(r'FilmPosterGraphic', re.I))
                 if poster and poster.get('src'):
                     movie['poster_url'] = urljoin(base_url, poster['src'])
 
