@@ -1567,6 +1567,9 @@ def poll_leaderboard(poll_id):
                 elif poll.scoring_mode == 'ranked':
                     # For ranked: award points based on rank (lower rank = more points)
                     scores[uid]['kernels'] += max(1, 4 - (vote.rank or 1))
+            elif correct_id and poll.scoring_mode == 'confidence':
+                # Wrong answer with confidence scoring: deduct the confidence value
+                scores[uid]['kernels'] -= vote.confidence
 
     # Build leaderboard
     leaderboard = []
@@ -1604,6 +1607,9 @@ def user_kernels(user_id):
                 total += 1
             elif poll.scoring_mode == 'ranked':
                 total += max(1, 4 - (vote.rank or 1))
+        elif poll.scoring_mode == 'confidence':
+            # Wrong answer with confidence scoring: deduct the confidence value
+            total -= vote.confidence
     return jsonify({'user_id': user_id, 'kernels': total})
 
 
