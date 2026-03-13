@@ -1908,6 +1908,31 @@ input { font-family: inherit; }
 }
 .poll-submit-btn:hover:not(:disabled) { opacity: 0.85; }
 .poll-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Auto-save indicators */
+.poll-save-indicator {
+  display: inline-block;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  margin-top: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.poll-save-indicator.saving { color: var(--muted); }
+.poll-save-indicator.saved { color: var(--gold); }
+.poll-save-indicator.error { color: #e74c3c; }
+.poll-autosave-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  font-style: italic;
+}
+.poll-winner-select .poll-save-indicator {
+  margin-top: 0;
+  margin-left: 0.5rem;
+}
+
 .poll-cancel-btn {
   padding: 0.5rem 1rem;
   font-size: 0.7rem;

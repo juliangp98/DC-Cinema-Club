@@ -1513,6 +1513,35 @@ def submit_votes(poll_id):
     return jsonify({'message': 'Votes submitted', 'count': len(valid_votes)})
 
 
+@app.route('/api/polls/<int:poll_id>/categories/<int:cat_id>/winner', methods=['PUT'])
+@require_auth
+def set_category_winner(poll_id, cat_id):
+    """Set (or clear) the correct answer for a single category – used for live scoring."""
+    poll = db.session.get(Poll, poll_id)
+    if not poll:
+        return jsonify({'error': 'Poll not found'}), 404
+    user, membership = _require_group_member(poll.group_id)
+    if not membership or membership.role != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+
+    cat = db.session.get(PollCategory, cat_id)
+    if not cat or cat.poll_id != poll.id:
+        return jsonify({'error': 'Category not found'}), 404
+
+    data = request.json  # { option_id: int | null }
+    opt_id = data.get('option_id')
+    if opt_id:
+        opt = db.session.get(PollOption, opt_id)
+        if not opt or opt.category_id != cat_id:
+            return jsonify({'error': 'Invalid option'}), 400
+        cat.correct_option_id = opt_id
+    else:
+        cat.correct_option_id = None
+
+    db.session.commit()
+    return jsonify({'category_id': cat_id, 'correct_option_id': cat.correct_option_id})
+
+
 @app.route('/api/polls/<int:poll_id>/score', methods=['POST'])
 @require_auth
 def score_poll(poll_id):
