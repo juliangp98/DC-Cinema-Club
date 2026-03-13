@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import GroupMembers from "./GroupMembers";
 
-export default function GroupSwitcher({ apiBase, activeGroupId, setGroupId, onViewProfile }) {
+export default function GroupSwitcher({ apiBase, activeGroupId, setGroupId }) {
   const [groups, setGroups] = useState([]);
   const [open, setOpen] = useState(false);
-  const [showMembers, setShowMembers] = useState(false);
   const ref = useRef(null);
   const navigate = useNavigate();
 
@@ -40,53 +38,42 @@ export default function GroupSwitcher({ apiBase, activeGroupId, setGroupId, onVi
   const activeGroup = groups.find(g => g.id === activeGroupId);
 
   return (
-    <>
-      <div className="group-switcher" ref={ref}>
-        <button className="group-switcher-btn" onClick={() => setOpen(!open)}>
-          {activeGroup ? activeGroup.name : "Select Group"}
-          <span className="group-switcher-caret">{open ? "\u25B4" : "\u25BE"}</span>
-        </button>
+    <div className="group-switcher" ref={ref}>
+      <button className="group-switcher-btn" onClick={() => setOpen(!open)}>
+        {activeGroup ? activeGroup.name : "Select Group"}
+        <span className="group-switcher-caret">{open ? "\u25B4" : "\u25BE"}</span>
+      </button>
 
-        {open && (
-          <div className="group-dropdown">
-            {groups.map(g => (
-              <button
-                key={g.id}
-                className={`group-dropdown-item${g.id === activeGroupId ? " active" : ""}`}
-                onClick={() => { setGroupId(g.id); setOpen(false); }}
-              >
-                <span className="group-dropdown-name">{g.name}</span>
-                {g.role === "admin" && <span className="group-role-badge">admin</span>}
-              </button>
-            ))}
-            <div className="group-dropdown-actions">
-              {activeGroup && (
-                <button
-                  className="group-dropdown-action"
-                  onClick={() => { setOpen(false); setShowMembers(true); }}
-                >
-                  Members
-                </button>
-              )}
+      {open && (
+        <div className="group-dropdown">
+          {groups.map(g => (
+            <button
+              key={g.id}
+              className={`group-dropdown-item${g.id === activeGroupId ? " active" : ""}`}
+              onClick={() => { setGroupId(g.id); setOpen(false); }}
+            >
+              <span className="group-dropdown-name">{g.name}</span>
+              {g.role === "admin" && <span className="group-role-badge">admin</span>}
+            </button>
+          ))}
+          <div className="group-dropdown-actions">
+            {activeGroup && (
               <button
                 className="group-dropdown-action"
-                onClick={() => { setOpen(false); navigate("/groups"); }}
+                onClick={() => { setOpen(false); navigate("/members"); }}
               >
-                Browse
+                Members
               </button>
-            </div>
+            )}
+            <button
+              className="group-dropdown-action"
+              onClick={() => { setOpen(false); navigate("/groups"); }}
+            >
+              Browse
+            </button>
           </div>
-        )}
-      </div>
-
-      {showMembers && activeGroup && (
-        <GroupMembers
-          group={activeGroup}
-          apiBase={apiBase}
-          onClose={() => setShowMembers(false)}
-          onViewProfile={onViewProfile}
-        />
+        </div>
       )}
-    </>
+    </div>
   );
 }

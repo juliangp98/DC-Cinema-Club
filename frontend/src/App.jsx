@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, useNavigate } from "
 import Calendar from "./pages/Calendar";
 import Login from "./pages/Login";
 import GroupDiscovery from "./pages/GroupDiscovery";
+import MembersPage from "./pages/MembersPage";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
@@ -165,6 +166,19 @@ export default function App() {
                 apiBase={API_BASE}
                 activeGroupId={activeGroupId}
                 setGroupId={handleSetGroupId}
+              />
+            </AuthGuard>
+          }
+        />
+        <Route
+          path="/members"
+          element={
+            <AuthGuard user={user} loading={loading} apiBase={API_BASE} onLogin={handleLogin}>
+              <MembersPage
+                user={user}
+                setUser={setUser}
+                apiBase={API_BASE}
+                activeGroupId={activeGroupId}
               />
             </AuthGuard>
           }

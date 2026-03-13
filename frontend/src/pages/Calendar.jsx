@@ -303,46 +303,47 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
         <span className="header-logo" onClick={goToday} style={{ cursor: "pointer" }}>CINEMA CLUB DC</span>
         <div className="header-sep" />
 
-        <div className="nav-week">
-          <button className="nav-btn" onClick={prevMonth}>&lsaquo;</button>
-          <button className="nav-today" onClick={goToday}>Today</button>
-          <button className="nav-btn" onClick={nextMonth}>&rsaquo;</button>
-          <span className="nav-range">
-            {MONTHS[month]} {year}
-          </span>
-        </div>
-
-        <div className="header-spacer" />
-
-        {/* Group Switcher */}
-        <GroupSwitcher
-          apiBase={apiBase}
-          activeGroupId={groupId}
-          setGroupId={setGroupId}
-          onViewProfile={setProfileUserId}
-        />
-
-        <div className="header-sep" />
-
-        {/* User avatar */}
-        <div style={{ position: "relative" }}>
-          <div
-            className="user-avatar"
-            style={{ background: user.avatar_color, color: "#0d0c09" }}
-            title={`${user.name} — ${user.email}`}
-            onClick={() => setShowProfile(!showProfile)}
-          >
-            {user.name.slice(0, 2).toUpperCase()}
+        <div className="header-nav-row">
+          <div className="nav-week">
+            <button className="nav-btn" onClick={prevMonth}>&lsaquo;</button>
+            <button className="nav-today" onClick={goToday}>Today</button>
+            <button className="nav-btn" onClick={nextMonth}>&rsaquo;</button>
+            <span className="nav-range">
+              {MONTHS[month]} {year}
+            </span>
           </div>
-          {showProfile && (
-            <ProfileMenu
-              user={user}
-              apiBase={apiBase}
-              onUpdate={handleProfileUpdate}
-              onLogout={logout}
-              onClose={() => setShowProfile(false)}
-            />
-          )}
+
+          <div className="header-spacer" />
+
+          {/* Group Switcher */}
+          <GroupSwitcher
+            apiBase={apiBase}
+            activeGroupId={groupId}
+            setGroupId={setGroupId}
+          />
+
+          <div className="header-sep" />
+
+          {/* User avatar */}
+          <div style={{ position: "relative" }}>
+            <div
+              className="user-avatar"
+              style={{ background: user.avatar_color, color: "#0d0c09" }}
+              title={`${user.name} — ${user.email}`}
+              onClick={() => setShowProfile(!showProfile)}
+            >
+              {user.name.slice(0, 2).toUpperCase()}
+            </div>
+            {showProfile && (
+              <ProfileMenu
+                user={user}
+                apiBase={apiBase}
+                onUpdate={handleProfileUpdate}
+                onLogout={logout}
+                onClose={() => setShowProfile(false)}
+              />
+            )}
+          </div>
         </div>
       </header>
 

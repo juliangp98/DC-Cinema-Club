@@ -214,6 +214,7 @@ input { font-family: inherit; }
   white-space: nowrap;
 }
 .header-spacer { flex: 1; }
+.header-nav-row { display: contents; }
 
 /* ── Filter Bar ────────────────────────────────────────────────────────── */
 .filter-bar {
@@ -1681,6 +1682,12 @@ input { font-family: inherit; }
   flex: 1;
   overflow: hidden;
 }
+.group-members-body.embedded {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-top: 1rem;
+  min-height: 400px;
+}
 .group-members-list {
   width: 280px;
   border-right: 1px solid var(--border);
@@ -1838,9 +1845,18 @@ input { font-family: inherit; }
     order: -1;
   }
   .header-sep { display: none; }
-  .header-spacer { display: none; }
+  .header-nav-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .header-nav-row .header-spacer { display: block; flex: 1; min-width: 0; }
+  .header-nav-row .header-sep { display: none; }
   .nav-week { flex-shrink: 0; }
-  .group-switcher { margin-left: auto; }
+  .group-switcher { flex-shrink: 1; min-width: 0; overflow: visible; }
   .nav-range { font-size: 0.65rem; }
   .filter-bar {
     flex-wrap: wrap;
@@ -1863,7 +1879,7 @@ input { font-family: inherit; }
   .filter-time-label { display: none; }
   .filter-time-pill { padding: 0.25rem 0.45rem; }
   .group-switcher-btn {
-    max-width: none;
+    max-width: 100%;
   }
   .group-dropdown {
     right: 0;
