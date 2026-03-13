@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import GroupAdmin from "../components/GroupAdmin";
-import GroupMembers from "../components/GroupMembers";
 import UserProfileDrawer from "../components/UserProfileDrawer";
 import ProfileMenu from "../components/ProfileMenu";
 
@@ -30,8 +29,6 @@ export default function GroupDiscovery({ user, setUser, apiBase, activeGroupId, 
   // Admin panel
   const [adminGroup, setAdminGroup] = useState(null);
 
-  // Members overlay
-  const [membersGroup, setMembersGroup] = useState(null);
 
   // Profile drawer
   const [profileUserId, setProfileUserId] = useState(null);
@@ -218,7 +215,7 @@ export default function GroupDiscovery({ user, setUser, apiBase, activeGroupId, 
                     )}
                     <button
                       className="group-card-members-btn"
-                      onClick={() => setMembersGroup(g)}
+                      onClick={() => { setGroupId(g.id); navigate("/members"); }}
                     >
                       Members
                     </button>
@@ -394,16 +391,6 @@ export default function GroupDiscovery({ user, setUser, apiBase, activeGroupId, 
           )}
         </section>
       </div>
-
-      {/* Members overlay */}
-      {membersGroup && (
-        <GroupMembers
-          group={membersGroup}
-          apiBase={apiBase}
-          onClose={() => setMembersGroup(null)}
-          onViewProfile={setProfileUserId}
-        />
-      )}
 
       {/* User profile drawer */}
       {profileUserId && (

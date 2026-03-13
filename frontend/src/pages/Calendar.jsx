@@ -77,11 +77,15 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
   // Filter bar state
   const [searchText, setSearchText]       = useState("");
   const [selectedMovies, setSelectedMovies] = useState(new Set());
+  const [selectedMembers, setSelectedMembers] = useState(new Set());
   const [timeOfDay, setTimeOfDay]         = useState(new Set());
   const [showTheatreDD, setShowTheatreDD] = useState(false);
   const [showMovieDD, setShowMovieDD]     = useState(false);
+  const [showMemberDD, setShowMemberDD]   = useState(false);
+  const [groupMembers, setGroupMembers]   = useState([]);
   const theatreDDRef = useRef(null);
   const movieDDRef   = useRef(null);
+  const memberDDRef  = useRef(null);
 
   const calDays = buildCalendarDays(year, month);
 
@@ -106,12 +110,13 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
     function handleClick(e) {
       if (theatreDDRef.current && !theatreDDRef.current.contains(e.target)) setShowTheatreDD(false);
       if (movieDDRef.current && !movieDDRef.current.contains(e.target)) setShowMovieDD(false);
+      if (memberDDRef.current && !memberDDRef.current.contains(e.target)) setShowMemberDD(false);
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Fetch all theatres + active group's theatre config
+  // Fetch all theatres + active group's theatre config + group members
   useEffect(() => {
     async function loadTheatreData() {
       try {
@@ -129,6 +134,20 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
             if (gData.theatres && gData.theatres.length > 0) {
               gTheatres = gData.theatres;
             }
+            // Fetch group members
+            if (gData.slug) {
+              try {
+                const membersRes = await fetch(`${apiBase}/api/groups/${gData.slug}/members`, { credentials: "include" });
+                if (membersRes.ok) {
+                  const membersData = await membersRes.json();
+                  setGroupMembers(
+                    membersData
+                      .filter(m => m.status === "active" && m.user)
+                      .map(m => m.user)
+                  );
+                }
+              } catch { /* ignore */ }
+            }
           }
           setGroupTheatres(gTheatres);
           setActiveTheatres(new Set(gTheatres));
@@ -136,6 +155,7 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
       } catch { /* ignore */ }
     }
     loadTheatreData();
+    setSelectedMembers(new Set());
   }, [apiBase, groupId]);
 
   const fetchShowtimes = useCallback(async () => {
@@ -212,13 +232,23 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
     });
   }
 
+  function toggleMember(userId) {
+    setSelectedMembers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }
+
   function clearAllFilters() {
     setSelectedMovies(new Set());
+    setSelectedMembers(new Set());
     setTimeOfDay(new Set());
     setSearchText("");
   }
 
-  const hasActiveFilters = selectedMovies.size > 0 || timeOfDay.size > 0;
+  const hasActiveFilters = selectedMovies.size > 0 || timeOfDay.size > 0 || selectedMembers.size > 0;
 
   function getGroupedShowtimes(date) {
     const dayShowtimes = showtimes.filter(s => {
@@ -267,6 +297,10 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
         }
       }
       return { ...g, uniqueAttendees };
+    }).filter(g => {
+      // Member filter: only show if at least one selected member is attending
+      if (selectedMembers.size === 0) return true;
+      return g.uniqueAttendees.some(a => selectedMembers.has(a.id));
     });
   }
 
@@ -303,57 +337,65 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
         <span className="header-logo" onClick={goToday} style={{ cursor: "pointer" }}>CINEMA CLUB DC</span>
         <div className="header-sep" />
 
-        <div className="header-nav-row">
-          <div className="nav-week">
-            <button className="nav-btn" onClick={prevMonth}>&lsaquo;</button>
-            <button className="nav-today" onClick={goToday}>Today</button>
-            <button className="nav-btn" onClick={nextMonth}>&rsaquo;</button>
-            <span className="nav-range">
-              {MONTHS[month]} {year}
-            </span>
+        <div className="nav-week">
+          <button className="nav-btn" onClick={prevMonth}>&lsaquo;</button>
+          <button className="nav-today" onClick={goToday}>Today</button>
+          <button className="nav-btn" onClick={nextMonth}>&rsaquo;</button>
+          <span className="nav-range">
+            {MONTHS[month]} {year}
+          </span>
+        </div>
+
+        <div className="header-spacer" />
+
+        {/* Group Switcher */}
+        <GroupSwitcher
+          apiBase={apiBase}
+          activeGroupId={groupId}
+          setGroupId={setGroupId}
+        />
+
+        <div className="header-sep" />
+
+        {/* User avatar */}
+        <div style={{ position: "relative" }}>
+          <div
+            className="user-avatar"
+            style={{ background: user.avatar_color, color: "#0d0c09" }}
+            title={`${user.name} — ${user.email}`}
+            onClick={() => setShowProfile(!showProfile)}
+          >
+            {user.name.slice(0, 2).toUpperCase()}
           </div>
-
-          <div className="header-spacer" />
-
-          {/* Group Switcher */}
-          <GroupSwitcher
-            apiBase={apiBase}
-            activeGroupId={groupId}
-            setGroupId={setGroupId}
-          />
-
-          <div className="header-sep" />
-
-          {/* User avatar */}
-          <div style={{ position: "relative" }}>
-            <div
-              className="user-avatar"
-              style={{ background: user.avatar_color, color: "#0d0c09" }}
-              title={`${user.name} — ${user.email}`}
-              onClick={() => setShowProfile(!showProfile)}
-            >
-              {user.name.slice(0, 2).toUpperCase()}
-            </div>
-            {showProfile && (
-              <ProfileMenu
-                user={user}
-                apiBase={apiBase}
-                onUpdate={handleProfileUpdate}
-                onLogout={logout}
-                onClose={() => setShowProfile(false)}
-              />
-            )}
-          </div>
+          {showProfile && (
+            <ProfileMenu
+              user={user}
+              apiBase={apiBase}
+              onUpdate={handleProfileUpdate}
+              onLogout={logout}
+              onClose={() => setShowProfile(false)}
+            />
+          )}
         </div>
       </header>
 
       {/* Filter bar */}
       <div className="filter-bar">
+        {/* Nav controls (shown on mobile only, hidden on desktop — desktop uses header's nav) */}
+        <div className="nav-week filter-nav-week">
+          <button className="nav-btn" onClick={prevMonth}>&lsaquo;</button>
+          <button className="nav-today" onClick={goToday}>Today</button>
+          <button className="nav-btn" onClick={nextMonth}>&rsaquo;</button>
+          <span className="nav-range">
+            {MONTHS[month]} {year}
+          </span>
+        </div>
+
         {/* Theatre dropdown */}
         <div className="filter-dd" ref={theatreDDRef}>
           <button
             className="filter-dd-btn"
-            onClick={() => { setShowTheatreDD(v => !v); setShowMovieDD(false); }}
+            onClick={() => { setShowTheatreDD(v => !v); setShowMovieDD(false); setShowMemberDD(false); }}
           >
             <span className="filter-dd-dots">
               {allTheatres
@@ -384,6 +426,46 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
           )}
         </div>
 
+        {/* Members dropdown */}
+        <div className="filter-dd" ref={memberDDRef}>
+          <button
+            className="filter-dd-btn"
+            onClick={() => { setShowMemberDD(v => !v); setShowTheatreDD(false); setShowMovieDD(false); }}
+          >
+            {selectedMembers.size > 0 && (
+              <span className="filter-dd-dots">
+                {groupMembers
+                  .filter(m => selectedMembers.has(m.id))
+                  .slice(0, 3)
+                  .map(m => (
+                    <span key={m.id} className="filter-dot" style={{ background: m.avatar_color }} />
+                  ))}
+              </span>
+            )}
+            Members
+            {selectedMembers.size > 0 && <span className="filter-badge">{selectedMembers.size}</span>}
+            <span className="filter-dd-arrow">{showMemberDD ? "\u25B4" : "\u25BE"}</span>
+          </button>
+          {showMemberDD && (
+            <div className="filter-dd-menu filter-member-menu">
+              {groupMembers.length === 0 && (
+                <div className="filter-dd-empty">No members</div>
+              )}
+              {groupMembers.map(m => (
+                <label key={m.id} className="filter-dd-item filter-member-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedMembers.has(m.id)}
+                    onChange={() => toggleMember(m.id)}
+                  />
+                  <span className="filter-member-dot" style={{ background: m.avatar_color }} />
+                  {m.name}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Movie search */}
         <div className="filter-dd filter-search-wrap" ref={movieDDRef}>
           <div className="filter-search-box">
@@ -393,8 +475,8 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
               type="text"
               placeholder="Search movies..."
               value={searchText}
-              onChange={e => { setSearchText(e.target.value); setShowMovieDD(true); }}
-              onFocus={() => setShowMovieDD(true)}
+              onChange={e => { setSearchText(e.target.value); setShowMovieDD(true); setShowMemberDD(false); setShowTheatreDD(false); }}
+              onFocus={() => { setShowMovieDD(true); setShowMemberDD(false); setShowTheatreDD(false); }}
             />
             {selectedMovies.size > 0 && (
               <span className="filter-badge">{selectedMovies.size}</span>
@@ -402,6 +484,21 @@ export default function Calendar({ user, setUser, apiBase, groupId, setGroupId }
           </div>
           {showMovieDD && (
             <div className="filter-dd-menu filter-movie-menu">
+              {filteredMovies.length > 0 && (
+                <button
+                  className="filter-select-all"
+                  onClick={() => {
+                    const allSelected = filteredMovies.every(m => selectedMovies.has(m.id));
+                    setSelectedMovies(prev => {
+                      const next = new Set(prev);
+                      filteredMovies.forEach(m => allSelected ? next.delete(m.id) : next.add(m.id));
+                      return next;
+                    });
+                  }}
+                >
+                  {filteredMovies.every(m => selectedMovies.has(m.id)) ? "Deselect All" : "Select All"}
+                </button>
+              )}
               {filteredMovies.length === 0 && (
                 <div className="filter-dd-empty">No matches</div>
               )}

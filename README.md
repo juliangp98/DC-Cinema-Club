@@ -351,29 +351,74 @@ If you want to access Cinema Club DC from outside your home network with a custo
 
 #### Option A: Cloudflare Tunnel (Recommended — no port forwarding)
 
-1. **Buy a domain** on Cloudflare or transfer an existing one to Cloudflare DNS
-2. **Install `cloudflared`** on your NAS:
-   - SSH into your NAS
-   - Download the ARM64 or AMD64 binary from [Cloudflare Tunnel releases](https://github.com/cloudflare/cloudflared/releases)
-   - Or run it as a Docker container (easiest on Synology):
-     ```bash
-     sudo docker run -d --name cloudflared --restart unless-stopped \
-       cloudflare/cloudflared:latest tunnel --no-autoupdate run \
-       --token YOUR_TUNNEL_TOKEN
-     ```
-3. **Create a tunnel** in the Cloudflare Zero Trust dashboard:
-   - Go to [one.dash.cloudflare.com](https://one.dash.cloudflare.com) → Networks → Tunnels
-   - Create a tunnel, copy the token
-   - Add a public hostname: `cinema.yourdomain.com` → `http://localhost:8080`
-4. **Update `.env.production`**:
-   ```env
-   FRONTEND_URL=https://cinema.yourdomain.com
-   ```
-5. **Rebuild** to pick up the new FRONTEND_URL:
-   ```bash
-   cd /volume1/docker/cinema-club-dc
-   sudo docker-compose up -d --build
-   ```
+##### Step 1: Move DNS to Cloudflare
+
+1. Create a free [Cloudflare account](https://dash.cloudflare.com)
+2. Click **Add a Site** → enter your domain (e.g., `cinemaclubdc.com`)
+3. Select the **Free plan**
+4. Cloudflare will give you two nameservers (e.g., `anna.ns.cloudflare.com`, `bob.ns.cloudflare.com`)
+5. At your registrar (e.g., Namecheap → Domain List → your domain → Nameservers), change from default DNS to **Custom DNS** → paste the two Cloudflare nameservers
+6. Wait for propagation (usually 15-30 minutes, can take up to 24 hours)
+
+##### Step 2: Create a Cloudflare Tunnel
+
+1. In Cloudflare dashboard → **Zero Trust** → **Networks** → **Tunnels**
+2. Click **Create a tunnel** → name it (e.g., `cinema-club-nas`)
+3. Copy the tunnel token
+4. **Important**: Delete any existing A or AAAA DNS records for your root domain (`cinemaclubdc.com`) in **Cloudflare → DNS → Records**. These conflict with the tunnel's CNAME record and will cause errors.
+5. In the tunnel's **Public Hostname** tab, add:
+
+   | Setting | Value |
+   |---------|-------|
+   | Public hostname | `cinemaclubdc.com` |
+   | Service Type | **HTTP** |
+   | Service URL | `cinemaclub-frontend:80` |
+
+   The service URL uses the Docker container name (not `localhost`) because cloudflared runs on the same Docker network.
+
+##### Step 3: Run cloudflared on your NAS
+
+SSH into your NAS and run cloudflared as a Docker container:
+
+```bash
+sudo docker run -d --name cloudflared \
+  --restart unless-stopped \
+  --network cinema-club-dc_default \
+  cloudflare/cloudflared:latest tunnel --no-autoupdate --protocol http2 run \
+  --token YOUR_TUNNEL_TOKEN
+```
+
+**Critical flags:**
+- `--network cinema-club-dc_default` — must match the Docker network your app containers use (check with `sudo docker network ls`)
+- `--protocol http2` — **required on Synology NAS**. The default QUIC protocol fails with `sendmsg: invalid argument` errors due to UDP issues on Synology's kernel. HTTP/2 works reliably.
+
+##### Step 4: Set SSL/TLS mode
+
+In **Cloudflare dashboard → SSL/TLS → Overview**, set the mode to **"Flexible"**.
+
+This is required because the nginx container serves HTTP (not HTTPS). The tunnel itself provides the secure transport. Using "Full" mode will cause **Error 525: SSL Handshake Failed**.
+
+##### Step 5: Set up www redirect
+
+Browsers often default to `www.yourdomain.com`. Without this, visitors will get a blank page.
+
+1. **Add a DNS record**: Cloudflare → DNS → Records → Add Record:
+   - Type: **CNAME**, Name: `www`, Target: `cinemaclubdc.com`, Proxy: **Proxied** (orange cloud)
+2. **Add a redirect rule**: Cloudflare → Rules → Redirect Rules → Create Rule:
+   - Rule name: `www to root`
+   - When: Hostname equals `www.cinemaclubdc.com`
+   - Then: Dynamic redirect to `https://cinemaclubdc.com/${http.request.uri.path}`, status **301**, preserve query string
+
+##### Step 6: Update `.env.production` and rebuild
+
+```env
+FRONTEND_URL=https://cinemaclubdc.com
+```
+
+```bash
+cd /volume1/docker/cinema-club-dc
+sudo docker-compose up -d --build
+```
 
 #### Option B: Synology DDNS + Reverse Proxy
 
@@ -463,6 +508,12 @@ sudo docker exec cinemaclub-backend python scraper.py
 | Permission denied on NAS | Use `sudo` for all docker commands, or add your user to the `docker` group |
 | Can't SSH into NAS | Enable SSH: DSM → Control Panel → Terminal & SNMP → Enable SSH service |
 | Build fails on ARM NAS | The Dockerfiles use standard images that support ARM64 (DS220+, DS920+, etc.) |
+| Cloudflare Error 525 (SSL Handshake Failed) | Set SSL/TLS mode to **Flexible** (not Full). The origin nginx serves HTTP only. |
+| Cloudflare tunnel QUIC/UDP errors (`sendmsg: invalid argument`) | Add `--protocol http2` flag to the cloudflared Docker run command. QUIC doesn't work on Synology NAS. |
+| Tunnel DNS error: "A, AAAA, or CNAME record already exists" | Delete existing A/AAAA records for the domain in Cloudflare DNS before configuring the tunnel hostname. |
+| `www.domain.com` shows blank page | Add a CNAME record for `www` + a Cloudflare redirect rule to the root domain. |
+| Cloudflared can't reach frontend container | Ensure cloudflared is on the same Docker network: `--network cinema-club-dc_default`. Verify with `sudo docker inspect cloudflared --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'` |
+| `.DS_Store` conflicts on `git pull` | Run `git stash && git pull && git stash drop`. Add `.DS_Store` to `.gitignore`. |
 
 ---
 

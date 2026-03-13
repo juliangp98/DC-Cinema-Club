@@ -187,7 +187,56 @@ Replaced the old theatre pill buttons in the header with a new **filter bar** be
 
 ---
 
-## Current State (as of 2026-03-12)
+## Session 8 (2026-03-13): Cloudflare Tunnel Deployment, Members Page, Mobile Nav Fixes
+
+### Cloudflare Tunnel Deployment
+
+Deployed to `cinemaclubdc.com` via Synology NAS + Cloudflare Tunnel. Resolved several issues:
+
+1. **QUIC/UDP failure on Synology NAS** — cloudflared default QUIC protocol fails with `sendmsg: invalid argument`. Fixed by adding `--protocol http2` to the Docker run command.
+
+2. **Error 525 SSL Handshake Failed** — Cloudflare SSL/TLS mode was set to "Full", which tries HTTPS to the origin. The nginx container only serves HTTP. Fixed by setting SSL/TLS mode to **Flexible**.
+
+3. **DNS CNAME conflict** — Existing A/AAAA records for `cinemaclubdc.com` blocked the tunnel's CNAME creation. Fixed by deleting the old records first.
+
+4. **Wrong Docker network** — cloudflared was on the default `bridge` network, not `cinema-club-dc_default`, so it couldn't resolve `cinemaclub-frontend` by container name. Fixed by specifying `--network cinema-club-dc_default`.
+
+5. **www subdomain blank page** — Added CNAME for `www` + Cloudflare redirect rule (301) from `www.cinemaclubdc.com` to `cinemaclubdc.com`.
+
+6. **`.DS_Store` git conflicts** — macOS `.DS_Store` files on NAS conflicted with pulls. Fixed with `git stash && git pull && git stash drop`.
+
+### Deployment Details
+- **Domain**: cinemaclubdc.com (registered on Namecheap, DNS on Cloudflare free tier)
+- **NAS hostname**: `jgp-photography`, locally accessible at `http://jgp-photography:8080/`
+- **Docker network**: `cinema-club-dc_default`
+- **Tunnel service**: `http://cinemaclub-frontend:80`
+- **Cloudflared command**: `sudo docker run -d --name cloudflared --restart unless-stopped --network cinema-club-dc_default cloudflare/cloudflared:latest tunnel --no-autoupdate --protocol http2 run --token TOKEN`
+- **SSL/TLS mode**: Flexible
+- **www**: CNAME + 301 redirect rule to root
+
+### UI Work (In Progress)
+
+1. **Members page converted to full page** — `MembersPage.jsx` as `/members` route, matching GroupDiscovery layout (← Calendar, title, avatar). GroupSwitcher "Members" button now navigates to `/members` instead of opening an overlay.
+
+2. **Mobile header restructured** — Three-row layout: (1) centered site title, (2) nav controls left + group switcher + avatar right, (3) filter bar. Added `.header-nav-row` wrapper for the second row that prevents wrapping on mobile.
+
+3. **Group name truncation** — `.group-switcher` gets `flex-shrink: 1; min-width: 0; overflow: hidden` so long names truncate with ellipsis instead of breaking to a new line.
+
+4. **Dropdown z-index fix** — Header `z-index` raised to 20 (from 10) to ensure group dropdown renders above filter bar (z-index 9).
+
+5. **Theatre pill styling** — Added `.theatre-pill` CSS styles for group admin/create forms with active/inactive states and theatre-specific colors.
+
+6. **Dev environment setup** — `backend/.env.development` with separate `cinemaclub_dev.db`, auto-detected locally. `.gitignore` excludes dev files.
+
+### Still Pending
+- Theatre pill spacing (gap between pills, padding before buttons)
+- Today button scroll behavior
+- Morning emoji size fix (needs VS16 variation selector)
+- Profile menu popup for Members/Browse buttons in GroupSwitcher dropdown
+
+---
+
+## Current State (as of 2026-03-13)
 
 ### What's Working
 - Full auth flow (register, login, logout) from both Calendar and Groups pages
@@ -197,6 +246,8 @@ Replaced the old theatre pill buttons in the header with a new **filter bar** be
 - Profile system: edit own profile, view others' profiles via drawer
 - Scrapers: Suns Cinema (now-showing + coming-soon) and AFI Silver (70 films from Vista platform)
 - Mobile responsive: all pages usable at 375px width
+- **Live deployment**: cinemaclubdc.com via Synology NAS + Cloudflare Tunnel
+- Members page as full route (`/members`) with same layout as Groups page
 
 ### Theatre Data
 - Suns Cinema (slug: "suns", color: #e8a838 / var(--suns))

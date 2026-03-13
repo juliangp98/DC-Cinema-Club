@@ -32,7 +32,8 @@
       "Bash(grep -E '\\\\.\\(env|txt|cfg|yaml|yml|json\\)$|requirements|Dockerfile')",
       "Bash(git rm:*)",
       "Bash(lsof -ti:5173)",
-      "Bash(xargs ls:*)"
+      "Bash(xargs ls:*)",
+      "WebSearch"
     ]
   }
 }
