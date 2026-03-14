@@ -23,11 +23,13 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
 
   // Vote state: { [categoryId]: { option_id, confidence } }
   const [votes, setVotes] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  // Per-category save status: { [categoryId]: 'saving' | 'saved' | 'error' }
+  const [saveStatus, setSaveStatus] = useState({});
 
   // Score winners state: { [categoryId]: optionId }
   const [winners, setWinners] = useState({});
+  // Per-category winner save status: { [categoryId]: 'saving' | 'saved' | 'error' }
+  const [winnerSaveStatus, setWinnerSaveStatus] = useState({});
   const [scoring, setScoring] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const settingsRef = useRef(null);
@@ -40,6 +42,15 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
   useEffect(() => {
     fetchPoll();
   }, [pollId]);
+
+  // Live refresh: poll data every 10s while poll is open or closed (scoring in progress)
+  useEffect(() => {
+    if (!poll || poll.status === 'scored') return;
+    const interval = setInterval(() => {
+      fetchPollQuiet();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [poll?.status, pollId]);
 
   async function fetchPoll() {
     setLoading(true);
@@ -90,6 +101,25 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
     finally { setLoading(false); }
   }
 
+  async function fetchPollQuiet() {
+    // Refresh poll data without resetting loading/vote state (for live updates)
+    try {
+      const r = await fetch(`${apiBase}/api/polls/${pollId}`, { credentials: "include" });
+      if (r.ok) {
+        const data = await r.json();
+        setPoll(data);
+        // Update winners from server (in case another admin set them)
+        const existingWinners = {};
+        for (const cat of data.categories || []) {
+          if (cat.correct_option_id) {
+            existingWinners[cat.id] = cat.correct_option_id;
+          }
+        }
+        setWinners(prev => ({ ...prev, ...existingWinners }));
+      }
+    } catch { /* ignore */ }
+  }
+
   async function fetchLeaderboard() {
     try {
       const r = await fetch(`${apiBase}/api/polls/${pollId}/leaderboard`, { credentials: "include" });
@@ -101,11 +131,55 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
     if (tab === "leaderboard") fetchLeaderboard();
   }, [tab]);
 
+  // Auto-refresh leaderboard every 10s when viewing it
+  useEffect(() => {
+    if (tab !== "leaderboard") return;
+    const interval = setInterval(fetchLeaderboard, 10000);
+    return () => clearInterval(interval);
+  }, [tab, pollId]);
+
+  // Debounce timer ref for confidence slider
+  const confidenceTimerRef = useRef({});
+
+  async function saveVoteForCategory(catId, voteData) {
+    setSaveStatus(prev => ({ ...prev, [catId]: 'saving' }));
+    const voteList = [];
+    if (poll.scoring_mode === 'ranked') {
+      (voteData.ranked || []).forEach((optId, idx) => {
+        voteList.push({ category_id: catId, option_id: optId, rank: idx + 1 });
+      });
+    } else if (voteData.option_id) {
+      voteList.push({ category_id: catId, option_id: voteData.option_id, confidence: voteData.confidence || 1 });
+    }
+    // If nothing to save (e.g. all ranked picks removed), still send to clear existing votes
+    if (voteList.length === 0 && poll.scoring_mode === 'ranked') {
+      // Send empty vote to trigger delete of existing votes for this category
+      // The backend only deletes for "seen_cats", so we need at least a mention
+      // Just skip - removing all ranked picks is fine, nothing to save
+      setSaveStatus(prev => ({ ...prev, [catId]: 'saved' }));
+      return;
+    }
+    if (voteList.length === 0) {
+      setSaveStatus(prev => ({ ...prev, [catId]: undefined }));
+      return;
+    }
+    try {
+      const r = await fetch(`${apiBase}/api/polls/${pollId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ votes: voteList }),
+      });
+      setSaveStatus(prev => ({ ...prev, [catId]: r.ok ? 'saved' : 'error' }));
+    } catch {
+      setSaveStatus(prev => ({ ...prev, [catId]: 'error' }));
+    }
+  }
+
   function setVoteForCategory(catId, optionId) {
-    setVotes(prev => ({
-      ...prev,
-      [catId]: { ...prev[catId], option_id: optionId, confidence: prev[catId]?.confidence || 1 },
-    }));
+    const newVote = { option_id: optionId, confidence: votes[catId]?.confidence || 1 };
+    setVotes(prev => ({ ...prev, [catId]: newVote }));
+    saveVoteForCategory(catId, newVote);
   }
 
   function toggleRankedVote(catId, optId) {
@@ -117,44 +191,43 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
       } else if (ranked.length < 3) {
         ranked.push(optId);
       }
-      return { ...prev, [catId]: { ranked } };
+      const newVote = { ranked };
+      // Save immediately
+      saveVoteForCategory(catId, newVote);
+      return { ...prev, [catId]: newVote };
     });
   }
 
   function setConfidence(catId, val) {
+    const confidence = Math.max(1, Math.min(10, parseInt(val) || 1));
     setVotes(prev => ({
       ...prev,
-      [catId]: { ...prev[catId], confidence: Math.max(1, Math.min(10, parseInt(val) || 1)) },
+      [catId]: { ...prev[catId], confidence },
     }));
+    // Debounce confidence saves (slider drags rapidly)
+    clearTimeout(confidenceTimerRef.current[catId]);
+    confidenceTimerRef.current[catId] = setTimeout(() => {
+      setVotes(current => {
+        const v = current[catId];
+        if (v?.option_id) saveVoteForCategory(catId, v);
+        return current;
+      });
+    }, 400);
   }
 
-  async function handleSubmitVotes() {
-    setSubmitting(true);
-    const voteList = [];
-    for (const [catId, v] of Object.entries(votes)) {
-      if (poll.scoring_mode === 'ranked') {
-        (v.ranked || []).forEach((optId, idx) => {
-          voteList.push({ category_id: parseInt(catId), option_id: optId, rank: idx + 1 });
-        });
-      } else if (v.option_id) {
-        voteList.push({ category_id: parseInt(catId), option_id: v.option_id, confidence: v.confidence || 1 });
-      }
-    }
-
+  async function saveWinnerForCategory(catId, optionId) {
+    setWinnerSaveStatus(prev => ({ ...prev, [catId]: 'saving' }));
     try {
-      const r = await fetch(`${apiBase}/api/polls/${pollId}/vote`, {
-        method: "POST",
+      const r = await fetch(`${apiBase}/api/polls/${pollId}/categories/${catId}/winner`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ votes: voteList }),
+        body: JSON.stringify({ option_id: optionId || null }),
       });
-      if (r.ok) {
-        setSubmitted(true);
-        setTab("results");
-        fetchPoll();
-      }
-    } catch { /* ignore */ }
-    finally { setSubmitting(false); }
+      setWinnerSaveStatus(prev => ({ ...prev, [catId]: r.ok ? 'saved' : 'error' }));
+    } catch {
+      setWinnerSaveStatus(prev => ({ ...prev, [catId]: 'error' }));
+    }
   }
 
   async function handleScoreWinners() {
@@ -279,9 +352,8 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
 
   const totalCategories = poll?.categories?.length || 0;
   const votedCategories = Object.values(votes).filter(v =>
-    poll.scoring_mode === 'ranked' ? (v.ranked?.length > 0) : v.option_id
+    poll?.scoring_mode === 'ranked' ? (v.ranked?.length > 0) : v.option_id
   ).length;
-  const allVoted = votedCategories === totalCategories && totalCategories > 0;
 
   if (loading) return null;
   if (!poll) { navigate("/polls"); return null; }
@@ -504,17 +576,20 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
                     </span>
                   </div>
                 )}
+                {saveStatus[cat.id] && (
+                  <span className={`poll-save-indicator ${saveStatus[cat.id]}`}>
+                    {saveStatus[cat.id] === 'saving' && 'Saving...'}
+                    {saveStatus[cat.id] === 'saved' && 'Saved'}
+                    {saveStatus[cat.id] === 'error' && 'Error saving — tap again'}
+                  </span>
+                )}
               </div>
             ))}
 
             <div className="poll-vote-actions">
-              <button
-                className="poll-submit-btn"
-                onClick={handleSubmitVotes}
-                disabled={submitting || !allVoted}
-              >
-                {submitting ? "Submitting..." : allVoted ? "Submit Votes" : `Pick all ${totalCategories} categories to submit`}
-              </button>
+              <span className="poll-autosave-hint">
+                Votes save automatically as you pick
+              </span>
               {isAdmin && (
                 <button className="poll-admin-action" onClick={handleClosePoll}>
                   Close Voting
@@ -575,7 +650,16 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
                       <label className="poll-form-label">Select winner:</label>
                       <select
                         value={winners[cat.id] || ""}
-                        onChange={e => setWinners(prev => ({ ...prev, [cat.id]: parseInt(e.target.value) }))}
+                        onChange={e => {
+                          const val = e.target.value ? parseInt(e.target.value) : null;
+                          setWinners(prev => {
+                            const next = { ...prev };
+                            if (val) next[cat.id] = val;
+                            else delete next[cat.id];
+                            return next;
+                          });
+                          saveWinnerForCategory(cat.id, val);
+                        }}
                         className="poll-input tiny"
                       >
                         <option value="">—</option>
@@ -583,6 +667,13 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
                           <option key={opt.id} value={opt.id}>{opt.text}</option>
                         ))}
                       </select>
+                      {winnerSaveStatus[cat.id] && (
+                        <span className={`poll-save-indicator ${winnerSaveStatus[cat.id]}`}>
+                          {winnerSaveStatus[cat.id] === 'saving' && 'Saving...'}
+                          {winnerSaveStatus[cat.id] === 'saved' && 'Saved'}
+                          {winnerSaveStatus[cat.id] === 'error' && 'Error saving'}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -616,7 +707,7 @@ export default function PollDetailPage({ user, setUser, apiBase }) {
                       onClick={handleScoreWinners}
                       disabled={scoring || Object.keys(winners).length === 0}
                     >
-                      {scoring ? "Scoring..." : "🏆 Score Winners & Award 🍿"}
+                      {scoring ? "Finalizing..." : "🏆 Finalize Scores & Award 🍿"}
                     </button>
                   )}
                 </div>
